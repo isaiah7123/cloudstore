@@ -228,9 +228,9 @@ function AuthModal({ mode, onClose, onSwitchMode, onLogin }: {
     try {
       if (mode === "login") {
         const { isSignedIn } = await signIn({ username: form.email, password: form.password });
-        // login can still use email since Cognito treats email as an alias for sign-in
         if (isSignedIn) {
-          onLogin(form.email.split("@")[0]);
+          const user = await getCurrentUser();
+          onLogin(user.username);
           onClose();
         }
       } else {
@@ -255,7 +255,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onLogin }: {
     // Auto sign in after confirmation — use email since it's the alias
     const { isSignedIn } = await signIn({ username: confirmEmail, password: form.password });
     if (isSignedIn) {
-      onLogin(confirmEmail.split("@")[0]);
+      onLogin(form.username);
       onClose();
     }
   };
@@ -703,7 +703,7 @@ export default function App() {
 
   useEffect(() => {
     getCurrentUser()
-      .then((user) => setUsername(user.signInDetails?.loginId?.split("@")[0] ?? user.username))
+      .then((user) => setUsername(user.username))
       .catch(() => {});
   }, []);
 
@@ -738,7 +738,7 @@ export default function App() {
               <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.875rem", color: "#8b829a" }}>
                 hi,{" "}
                 <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.875rem", fontWeight: "bold", color: "#8b829a", marginRight: "1.25rem" }}>
-                  {username}
+                  {username?.charAt(0).toUpperCase() + username?.slice(1)}
                 </span>
               </span>
               <button
