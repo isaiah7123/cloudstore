@@ -228,13 +228,14 @@ function AuthModal({ mode, onClose, onSwitchMode, onLogin }: {
     try {
       if (mode === "login") {
         const { isSignedIn } = await signIn({ username: form.email, password: form.password });
+        // login can still use email since Cognito treats email as an alias for sign-in
         if (isSignedIn) {
           onLogin(form.email.split("@")[0]);
           onClose();
         }
       } else {
         await signUp({
-          username: form.email,
+          username: form.username,
           password: form.password,
           options: { userAttributes: { email: form.email } },
         });
@@ -250,8 +251,8 @@ function AuthModal({ mode, onClose, onSwitchMode, onLogin }: {
 
   const handleConfirm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await confirmSignUp({ username: confirmEmail, confirmationCode: confirmCode });
-    // Auto sign in after confirmation
+    await confirmSignUp({ username: form.username, confirmationCode: confirmCode });
+    // Auto sign in after confirmation — use email since it's the alias
     const { isSignedIn } = await signIn({ username: confirmEmail, password: form.password });
     if (isSignedIn) {
       onLogin(confirmEmail.split("@")[0]);
