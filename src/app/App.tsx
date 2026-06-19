@@ -799,7 +799,7 @@ export default function App() {
               </h1>
               <p style={{ color: "#8b829a", fontSize: "1rem", lineHeight: 1.7, maxWidth: "380px" }}>
                 Cloudstore is a simple, free cloud storage service. Upload files and folders from any device
-                and retrieve them whenever you need — no fuss, no fees.
+                and retrieve them whenever you need.
               </p>
             </div>
 
@@ -918,19 +918,6 @@ export default function App() {
             <span style={{ fontFamily: "'DM Sans', sans-serif", color: "#b8aee8", fontSize: "0.8rem" }}>
               © 2026 Cloudstore
             </span>
-          </div>
-          <div className="flex gap-5">
-            {["Privacy", "Terms", "Contact"].map((l) => (
-              <a
-                key={l}
-                href="#"
-                style={{ fontFamily: "'DM Sans', sans-serif", color: "#c4bedd", fontSize: "0.8rem", textDecoration: "none" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#7c6fcd")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "#c4bedd")}
-              >
-                {l}
-              </a>
-            ))}
           </div>
         </div>
       </footer>

@@ -10,9 +10,14 @@ const CLIENT_ID = process.env.CLIENT_ID;
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
 async function getUser(event) {
-  const token = auth.slice(7);
-  const payload = await verifier.verify(token);
-  return payload.sub; // Cognito user ID
+  const claims = event.requestContext?.authorizer?.jwt?.claims;
+
+  if (!claims || !claims.sub) {
+    console.error("Missing JWT claims:", JSON.stringify(event.requestContext));
+    throw new Error("Unauthorized");
+  }
+
+  return claims.sub;
 }
 
 function response(statusCode, body) {
@@ -29,21 +34,9 @@ function response(statusCode, body) {
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export const handler = async (event) => {
+  console.log("EVENT:", JSON.stringify(event));
   const method = event.requestContext?.http?.method;
   const path = event.rawPath;
-
-  // CORS preflight — must return 200 before any auth check
-  if (method === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,DELETE,HEAD,OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization,Content-Type",
-      },
-      body: "",
-    };
-  }
 
   try {
     const userId = await getUser(event);
@@ -80,8 +73,18 @@ export const handler = async (event) => {
 
     // POST /files/upload-url — get presigned upload URL
     if (method === "POST" && path === "/files/upload-url") {
-      const { filename, contentType } = JSON.parse(event.body ?? "{}");
-      if (!filename) return response(400, { error: "filename required" });
+      let body = {};
+      try {
+        body = JSON.parse(event.body ?? "{}");
+      } catch (e) {
+        return response(400, { error: "Invalid JSON" });
+      }
+
+      const { filename, contentType } = body;
+
+      if (!filename) {
+        return response(400, { error: "filename required" });
+      }
 
       const key = `users/${userId}/${filename}`;
 
@@ -90,7 +93,7 @@ export const handler = async (event) => {
         Key: key,
         ContentType: contentType ?? "application/octet-stream",
         StorageClass: "GLACIER_IR",
-      }), { expiresIn: 900 }); // 15 min to upload
+      }), { expiresIn: 900 });
 
       return response(200, { url, key });
     }
@@ -125,8 +128,16 @@ export const handler = async (event) => {
     return response(404, { error: "Not found" });
 
   } catch (err) {
-    if (err.message === "Unauthorized") return response(401, { error: "Unauthorized" });
-    console.error(err);
+    console.error("Lambda error:", err);
+
+    if (
+      err.message === "Unauthorized" ||
+      err.name === "Unauthorized" ||
+      err.message?.includes("Unauthorized")
+    ) {
+      return response(401, { error: "Unauthorized" });
+    }
+
     return response(500, { error: "Internal server error" });
   }
 };
