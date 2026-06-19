@@ -23,10 +23,7 @@ async function getUser(event) {
 function response(statusCode, body) {
   return {
     statusCode,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "https://main.dck2qgm59c4hv.amplifyapp.com",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   };
 }

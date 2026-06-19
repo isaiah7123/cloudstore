@@ -5,7 +5,7 @@ const API = "https://fohkc53ail.execute-api.us-west-2.amazonaws.com/prod";
 
 async function authHeaders() {
   const session = await fetchAuthSession();
-  const token = session.tokens.accessToken.toString();
+  const token = session.tokens.idToken.toString();
   return { Authorization: `Bearer ${token}` };
 }
 
