@@ -1,33 +1,27 @@
 // index.mjs
 import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { CognitoJwtVerifier } from "aws-jwt-verify";
 
 const s3 = new S3Client({});
 const BUCKET = process.env.BUCKET_NAME;
 const USER_POOL_ID = process.env.USER_POOL_ID;
 const CLIENT_ID = process.env.CLIENT_ID;
 
-const verifier = CognitoJwtVerifier.create({
-  userPoolId: USER_POOL_ID,
-  tokenUse: "access",
-  clientId: CLIENT_ID,
-});
-
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
 async function getUser(event) {
-  const auth = event.headers?.authorization || event.headers?.Authorization;
-  if (!auth?.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = auth.slice(7);
   const payload = await verifier.verify(token);
   return payload.sub; // Cognito user ID
 }
 
-function response(statusCode, body, headers = {}) {
+function response(statusCode, body) {
   return {
     statusCode,
-    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", ...headers },
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "https://main.dck2qgm59c4hv.amplifyapp.com",
+    },
     body: JSON.stringify(body),
   };
 }
@@ -35,16 +29,16 @@ function response(statusCode, body, headers = {}) {
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export const handler = async (event) => {
-  const method = event.httpMethod;
-  const path = event.path;
+  const method = event.requestContext?.http?.method;
+  const path = event.rawPath;
 
-  // CORS preflight
+  // CORS preflight — must return 200 before any auth check
   if (method === "OPTIONS") {
     return {
       statusCode: 200,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+        "Access-Control-Allow-Methods": "GET,POST,DELETE,HEAD,OPTIONS",
         "Access-Control-Allow-Headers": "Authorization,Content-Type",
       },
       body: "",
