@@ -2,10 +2,11 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Cloud, Upload, FolderUp, X, Eye, EyeOff, FileArchive,
   CheckCircle2, FolderOpen, File, Download, Search, Image, 
-  FileText, Music, Archive, Info, ChevronDown, ChevronRight, FolderClosed,
+  FileText, Music, Archive, Info, ChevronDown, ChevronRight, FolderClosed, Trash2,
 } from "lucide-react";
 import { listFiles, uploadFile, getDownloadUrl, deleteFile } from "./api";
 import { signIn, signUp, confirmSignUp, signOut, getCurrentUser } from "aws-amplify/auth";
+import JSZip from "jszip";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,42 +63,77 @@ function buildTree(files: any[]): TreeNode[] {
   return root;
 }
 
-function TreeRow({ node, depth, onDownload, fmt }: {
+function collectFiles(node: TreeNode): any[] {
+  if (!node.isFolder) return node.file ? [node.file] : [];
+  return node.children.flatMap(collectFiles);
+}
+
+function flattenVisibleTree(nodes: TreeNode[]): TreeNode[] {
+  // Flattens tree in display order (folders included) for shift-click range selection
+  const out: TreeNode[] = [];
+  const walk = (list: TreeNode[]) => {
+    for (const n of list) {
+      out.push(n);
+      if (n.isFolder) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
+
+function TreeRow({ node, depth, selected, onToggleSelect, fmt }: {
   node: TreeNode;
   depth: number;
-  onDownload: (filename: string) => void;
+  selected: Set<string>;
+  onToggleSelect: (node: TreeNode, e: React.MouseEvent) => void;
   fmt: (b: number) => string;
 }) {
   const [open, setOpen] = useState(depth < 1);
   const indent = depth * 18;
+  const isSelected = selected.has(node.path);
 
   if (node.isFolder) {
     return (
       <div>
         <div
           className="flex items-center gap-2 rounded-lg px-2 py-1.5 cursor-pointer"
-          style={{ paddingLeft: `${8 + indent}px` }}
-          onClick={() => setOpen((o) => !o)}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#f0eef9")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          style={{
+            paddingLeft: `${8 + indent}px`,
+            background: isSelected ? "#ede9fe" : "transparent",
+          }}
+          onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#f0eef9"; }}
+          onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
         >
-          <span style={{ color: "#b8aee8", display: "flex", flexShrink: 0 }}>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(node, e as any); }}
+            onChange={() => {}}
+            style={{ flexShrink: 0, cursor: "pointer", accentColor: "#7c6fcd" }}
+          />
+          <span
+            style={{ color: "#b8aee8", display: "flex", flexShrink: 0, cursor: "pointer" }}
+            onClick={() => setOpen((o) => !o)}
+          >
             {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
           </span>
-          {open ? (
-            <FolderOpen size={15} color="#f4c2d8" strokeWidth={1.8} />
-          ) : (
-            <FolderClosed size={15} color="#f4c2d8" strokeWidth={1.8} />
-          )}
+          <span style={{ cursor: "pointer", display: "flex" }} onClick={() => setOpen((o) => !o)}>
+            {open ? (
+              <FolderOpen size={15} color="#f4c2d8" strokeWidth={1.8} />
+            ) : (
+              <FolderClosed size={15} color="#f4c2d8" strokeWidth={1.8} />
+            )}
+          </span>
           <span
             className="flex-1 truncate"
-            style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#2d2a35", fontWeight: 500 }}
+            style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#2d2a35", fontWeight: 500, cursor: "pointer" }}
+            onClick={() => setOpen((o) => !o)}
           >
             {node.name}
           </span>
         </div>
         {open && node.children.map((child, i) => (
-          <TreeRow key={i} node={child} depth={depth + 1} onDownload={onDownload} fmt={fmt} />
+          <TreeRow key={i} node={child} depth={depth + 1} selected={selected} onToggleSelect={onToggleSelect} fmt={fmt} />
         ))}
       </div>
     );
@@ -106,11 +142,22 @@ function TreeRow({ node, depth, onDownload, fmt }: {
   const file = node.file;
   return (
     <div
-      className="flex items-center gap-2 rounded-lg px-2 py-1.5 group cursor-pointer"
-      style={{ paddingLeft: `${8 + indent + 13}px` }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#f0eef9")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      className="flex items-center gap-2 rounded-lg px-2 py-1.5 cursor-pointer"
+      style={{
+        paddingLeft: `${8 + indent + 13}px`,
+        background: isSelected ? "#ede9fe" : "transparent",
+      }}
+      onClick={(e) => onToggleSelect(node, e)}
+      onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#f0eef9"; }}
+      onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
     >
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onClick={(e) => { e.stopPropagation(); onToggleSelect(node, e as any); }}
+        onChange={() => {}}
+        style={{ flexShrink: 0, cursor: "pointer", accentColor: "#7c6fcd" }}
+      />
       <FileIcon icon={node.name.split(".").pop()} />
       <span
         className="flex-1 truncate"
@@ -124,17 +171,6 @@ function TreeRow({ node, depth, onDownload, fmt }: {
       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "56px", textAlign: "right" }}>
         {file?.size != null ? fmt(file.size) : ""}
       </span>
-      <button
-        onClick={async (e) => {
-          e.stopPropagation();
-          onDownload(file.name);
-        }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-md p-1 ml-1"
-        style={{ background: "#ede9fe", border: "none", cursor: "pointer", flexShrink: 0 }}
-        title="Download"
-      >
-        <Download size={11} color="#7c6fcd" />
-      </button>
     </div>
   );
 }
@@ -160,30 +196,138 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
   const [query, setQuery] = useState("");
   const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [lastClickedPath, setLastClickedPath] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  const loadFiles = useCallback(() => {
     setLoading(true);
     listFiles()
       .then(setFiles)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [username]);
+  }, []);
+
+  useEffect(() => {
+    loadFiles();
+  }, [username, loadFiles]);
 
   const filtered = query
     ? files.filter((f) => f.name.toLowerCase().includes(query.toLowerCase()))
     : files;
 
   const tree = buildTree(filtered);
+  const visibleFlat = flattenVisibleTree(tree);
 
   const fmt = (b: number) =>
     b < 1024 ? `${b} B`
     : b < 1024 ** 2 ? `${(b / 1024).toFixed(1)} KB`
     : `${(b / 1024 ** 2).toFixed(1)} MB`;
 
-  const handleDownload = async (filename: string) => {
+  const handleToggleSelect = (node: TreeNode, e: React.MouseEvent) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+
+      if (e.shiftKey && lastClickedPath) {
+        const lastIdx = visibleFlat.findIndex((n) => n.path === lastClickedPath);
+        const curIdx = visibleFlat.findIndex((n) => n.path === node.path);
+        if (lastIdx !== -1 && curIdx !== -1) {
+          const [start, end] = lastIdx < curIdx ? [lastIdx, curIdx] : [curIdx, lastIdx];
+          for (let i = start; i <= end; i++) {
+            next.add(visibleFlat[i].path);
+          }
+          return next;
+        }
+      }
+
+      if (next.has(node.path)) {
+        next.delete(node.path);
+      } else {
+        next.add(node.path);
+      }
+      return next;
+    });
+    setLastClickedPath(node.path);
+  };
+
+  const getSelectedFiles = (): any[] => {
+    // Resolve selected paths (files or folders) down to actual file objects
+    const result: any[] = [];
+    const seen = new Set<string>();
+    const walk = (nodes: TreeNode[]) => {
+      for (const n of nodes) {
+        if (selected.has(n.path)) {
+          for (const f of collectFiles(n)) {
+            if (!seen.has(f.name)) {
+              seen.add(f.name);
+              result.push(f);
+            }
+          }
+        } else if (n.isFolder) {
+          walk(n.children);
+        }
+      }
+    };
+    walk(tree);
+    return result;
+  };
+
+  const handleBulkDelete = async () => {
+    const filesToDelete = getSelectedFiles();
+    if (filesToDelete.length === 0) return;
+    if (!confirm(`Delete ${filesToDelete.length} file${filesToDelete.length > 1 ? "s" : ""}? This can't be undone.`)) return;
+
+    setBusy(true);
+    try {
+      await Promise.all(filesToDelete.map((f) => deleteFile(f.name)));
+      setSelected(new Set());
+      loadFiles();
+    } catch (err) {
+      console.error(err);
+      alert("Some files failed to delete.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    const filesToDownload = getSelectedFiles();
+    if (filesToDownload.length === 0) return;
+
+    setBusy(true);
+    try {
+      if (filesToDownload.length === 1) {
+        const url = await getDownloadUrl(filesToDownload[0].name);
+        window.open(url, "_blank");
+      } else {
+        const zip = new JSZip();
+        for (const f of filesToDownload) {
+          const url = await getDownloadUrl(f.name);
+          const res = await fetch(url);
+          const blob = await res.blob();
+          zip.file(f.name, blob);
+        }
+        const blob = await zip.generateAsync({ type: "blob" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${username}-files.zip`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Download failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSingleDownload = async (filename: string) => {
     const url = await getDownloadUrl(filename);
     window.open(url, "_blank");
   };
+
+  const selectedCount = selected.size;
 
   return (
     <div
@@ -224,29 +368,68 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
           </button>
         </div>
 
-        {/* Search */}
+        {/* Search + bulk actions */}
         <div className="px-5 py-3" style={{ borderBottom: "1px solid #f0eef9" }}>
-          <div className="relative">
-            <Search size={14} color="#b8aee8" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-            <input
-              type="text"
-              placeholder="Search files…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full rounded-lg py-2 outline-none"
-              style={{
-                paddingLeft: "32px",
-                paddingRight: "12px",
-                background: "#f7f5f2",
-                border: "1px solid #e5e0f0",
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "0.8rem",
-                color: "#2d2a35",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "#b8aee8")}
-              onBlur={(e) => (e.target.style.borderColor = "#e5e0f0")}
-            />
-          </div>
+          {selectedCount > 0 ? (
+            <div className="flex items-center justify-between gap-2">
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.82rem", color: "#4a4558", fontWeight: 500 }}>
+                {selectedCount} selected
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelected(new Set())}
+                  disabled={busy}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "#8b829a", fontFamily: "'DM Sans', sans-serif", fontSize: "0.78rem" }}
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDownload}
+                  disabled={busy}
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5"
+                  style={{ background: "#ede9fe", border: "none", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}
+                >
+                  <Download size={13} color="#7c6fcd" />
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.78rem", color: "#7c6fcd", fontWeight: 600 }}>
+                    Download
+                  </span>
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={busy}
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5"
+                  style={{ background: "#fdeded", border: "none", cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}
+                >
+                  <Trash2 size={13} color="#e07b7b" />
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.78rem", color: "#e07b7b", fontWeight: 600 }}>
+                    Delete
+                  </span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative">
+              <Search size={14} color="#b8aee8" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+              <input
+                type="text"
+                placeholder="Search files…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full rounded-lg py-2 outline-none"
+                style={{
+                  paddingLeft: "32px",
+                  paddingRight: "12px",
+                  background: "#f7f5f2",
+                  border: "1px solid #e5e0f0",
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "0.8rem",
+                  color: "#2d2a35",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#b8aee8")}
+                onBlur={(e) => (e.target.style.borderColor = "#e5e0f0")}
+              />
+            </div>
+          )}
         </div>
 
         {/* Column headers */}
@@ -254,6 +437,7 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
           className="flex items-center gap-2 px-3 py-1.5"
           style={{ background: "#faf9fc", borderBottom: "1px solid #f0eef9" }}
         >
+          <span style={{ width: 15, flexShrink: 0 }} />
           <span style={{ width: 15, flexShrink: 0 }} />
           <span
             className="flex-1"
@@ -267,11 +451,18 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "56px", textAlign: "right", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Size
           </span>
-          <span style={{ width: 36 }} />
         </div>
 
         {/* File list */}
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto p-2" style={{ position: "relative" }}>
+          {busy && (
+            <div
+              className="flex items-center justify-center"
+              style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.7)", zIndex: 5 }}
+            >
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#7c6fcd" }}>Working…</span>
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#b8aee8" }}>Loading…</span>
@@ -284,7 +475,7 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
             </div>
           ) : (
             tree.map((node, i) => (
-              <TreeRow key={i} node={node} depth={0} onDownload={handleDownload} fmt={fmt} />
+              <TreeRow key={i} node={node} depth={0} selected={selected} onToggleSelect={handleToggleSelect} fmt={fmt} />
             ))
           )}
         </div>
