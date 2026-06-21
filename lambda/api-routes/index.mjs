@@ -31,9 +31,13 @@ function response(statusCode, body) {
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export const handler = async (event) => {
-  console.log("EVENT:", JSON.stringify(event));
   const method = event.requestContext?.http?.method;
-  const path = event.rawPath;
+  let path = event.rawPath;
+  const stage = event.requestContext?.stage;
+
+  if (stage && path.startsWith(`/${stage}`)) {
+    path = path.slice(stage.length + 1);
+  }
 
   try {
     const userId = await getUser(event);
