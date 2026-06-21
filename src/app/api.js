@@ -25,8 +25,9 @@ export async function getUploadUrl(filename, contentType, storageClass) {
   })).json();
 }
 
-export async function uploadFile(file, storageClass) {
-  const { url } = await getUploadUrl(file.name, file.type, storageClass);
+export async function uploadFile(file, storageClass, relativePath) {
+  const filename = relativePath || file.name;
+  const { url } = await getUploadUrl(filename, file.type, storageClass);
   await fetch(url, { method: "PUT", body: file });
 }
 

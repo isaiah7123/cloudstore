@@ -81,7 +81,7 @@ export const handler = async (event) => {
         return response(400, { error: "Invalid JSON" });
       }
 
-      const { filename, contentType } = body;
+      const { filename, contentType, storageClass } = body;
 
       if (!filename) {
         return response(400, { error: "filename required" });

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Cloud, Upload, FolderUp, X, Eye, EyeOff, FileArchive,
   CheckCircle2, FolderOpen, File, Download, Search, Image, 
-  FileText, Music, Archive, Info,
+  FileText, Music, Archive, Info, ChevronDown, ChevronRight, FolderClosed,
 } from "lucide-react";
 import { listFiles, uploadFile, getDownloadUrl, deleteFile } from "./api";
 import { signIn, signUp, confirmSignUp, signOut, getCurrentUser } from "aws-amplify/auth";
@@ -10,6 +10,134 @@ import { signIn, signUp, confirmSignUp, signOut, getCurrentUser } from "aws-ampl
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ModalMode = "login" | "signup";
+
+// ─── Directory Simulation ────────────────────────────────────────────────────
+
+type TreeNode = {
+  name: string;
+  path: string;
+  isFolder: boolean;
+  children: TreeNode[];
+  file?: any; // original file object, only present on leaf nodes
+};
+
+function buildTree(files: any[]): TreeNode[] {
+  const root: TreeNode[] = [];
+
+  for (const file of files) {
+    const parts = file.name.split("/").filter(Boolean);
+    let level = root;
+    let pathSoFar = "";
+
+    parts.forEach((part: string, i: number) => {
+      pathSoFar = pathSoFar ? `${pathSoFar}/${part}` : part;
+      const isLastPart = i === parts.length - 1;
+      let existing = level.find((n) => n.name === part && n.isFolder === !isLastPart);
+
+      if (!existing) {
+        existing = {
+          name: part,
+          path: pathSoFar,
+          isFolder: !isLastPart,
+          children: [],
+          file: isLastPart ? file : undefined,
+        };
+        level.push(existing);
+      }
+
+      level = existing.children;
+    });
+  }
+
+  // Sort: folders first, then alphabetical
+  const sortTree = (nodes: TreeNode[]) => {
+    nodes.sort((a, b) => {
+      if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    nodes.forEach((n) => sortTree(n.children));
+  };
+  sortTree(root);
+
+  return root;
+}
+
+function TreeRow({ node, depth, onDownload, fmt }: {
+  node: TreeNode;
+  depth: number;
+  onDownload: (filename: string) => void;
+  fmt: (b: number) => string;
+}) {
+  const [open, setOpen] = useState(depth < 1);
+  const indent = depth * 18;
+
+  if (node.isFolder) {
+    return (
+      <div>
+        <div
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 cursor-pointer"
+          style={{ paddingLeft: `${8 + indent}px` }}
+          onClick={() => setOpen((o) => !o)}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#f0eef9")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+        >
+          <span style={{ color: "#b8aee8", display: "flex", flexShrink: 0 }}>
+            {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </span>
+          {open ? (
+            <FolderOpen size={15} color="#f4c2d8" strokeWidth={1.8} />
+          ) : (
+            <FolderClosed size={15} color="#f4c2d8" strokeWidth={1.8} />
+          )}
+          <span
+            className="flex-1 truncate"
+            style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#2d2a35", fontWeight: 500 }}
+          >
+            {node.name}
+          </span>
+        </div>
+        {open && node.children.map((child, i) => (
+          <TreeRow key={i} node={child} depth={depth + 1} onDownload={onDownload} fmt={fmt} />
+        ))}
+      </div>
+    );
+  }
+
+  const file = node.file;
+  return (
+    <div
+      className="flex items-center gap-2 rounded-lg px-2 py-1.5 group cursor-pointer"
+      style={{ paddingLeft: `${8 + indent + 13}px` }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#f0eef9")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      <FileIcon icon={node.name.split(".").pop()} />
+      <span
+        className="flex-1 truncate"
+        style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#4a4558" }}
+      >
+        {node.name}
+      </span>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#b8aee8", whiteSpace: "nowrap" }}>
+        {file?.modified ? new Date(file.modified).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+      </span>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "56px", textAlign: "right" }}>
+        {file?.size != null ? fmt(file.size) : ""}
+      </span>
+      <button
+        onClick={async (e) => {
+          e.stopPropagation();
+          onDownload(file.name);
+        }}
+        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-md p-1 ml-1"
+        style={{ background: "#ede9fe", border: "none", cursor: "pointer", flexShrink: 0 }}
+        title="Download"
+      >
+        <Download size={11} color="#7c6fcd" />
+      </button>
+    </div>
+  );
+}
 
 // ─── Icon helper ─────────────────────────────────────────────────────────────
 
@@ -41,14 +169,21 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
       .finally(() => setLoading(false));
   }, [username]);
 
-  const filtered = files.filter((f) =>
-    f.name.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = query
+    ? files.filter((f) => f.name.toLowerCase().includes(query.toLowerCase()))
+    : files;
+
+  const tree = buildTree(filtered);
 
   const fmt = (b: number) =>
     b < 1024 ? `${b} B`
     : b < 1024 ** 2 ? `${(b / 1024).toFixed(1)} KB`
     : `${(b / 1024 ** 2).toFixed(1)} MB`;
+
+  const handleDownload = async (filename: string) => {
+    const url = await getDownloadUrl(filename);
+    window.open(url, "_blank");
+  };
 
   return (
     <div
@@ -141,46 +276,15 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
             <div className="flex items-center justify-center h-full">
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#b8aee8" }}>Loading…</span>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : tree.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#b8aee8" }}>
                 {query ? "No files match your search" : "No files yet"}
               </span>
             </div>
           ) : (
-            filtered.map((file, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 group cursor-pointer"
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#f0eef9")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-              >
-                <FileIcon icon={file.name.split(".").pop()} />
-                <span
-                  className="flex-1 truncate"
-                  style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.8rem", color: "#4a4558" }}
-                >
-                  {file.name}
-                </span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#b8aee8", whiteSpace: "nowrap" }}>
-                  {file.modified ? new Date(file.modified).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
-                </span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "56px", textAlign: "right" }}>
-                  {file.size != null ? fmt(file.size) : ""}
-                </span>
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const url = await getDownloadUrl(file.name);
-                    window.open(url, "_blank");
-                  }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity rounded-md p-1 ml-1"
-                  style={{ background: "#ede9fe", border: "none", cursor: "pointer", flexShrink: 0 }}
-                  title="Download"
-                >
-                  <Download size={11} color="#7c6fcd" />
-                </button>
-              </div>
+            tree.map((node, i) => (
+              <TreeRow key={i} node={node} depth={0} onDownload={handleDownload} fmt={fmt} />
             ))
           )}
         </div>
@@ -481,16 +585,16 @@ function UploadZone({ onUploaded, storageClass }: { onUploaded?: () => void; sto
     if (!files) return;
     const fileArr = Array.from(files);
 
-    // Add all files to list immediately as "uploading"
     setUploads((prev) => [
       ...prev,
       ...fileArr.map((f) => ({ name: f.name, size: fmt(f.size), status: "uploading" as const })),
     ]);
 
-    // Upload one by one, updating status as each finishes
     for (const file of fileArr) {
       try {
-        await uploadFile(file, storageClass);
+        // webkitRelativePath is populated when uploading via folder picker, e.g. "myfolder/sub/file.txt"
+        const relativePath = (file as any).webkitRelativePath || undefined;
+        await uploadFile(file, storageClass, relativePath);
         setUploads((prev) => prev.map((u) => u.name === file.name ? { ...u, status: "done" } : u));
       } catch {
         setUploads((prev) => prev.map((u) => u.name === file.name ? { ...u, status: "error" } : u));
