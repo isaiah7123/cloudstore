@@ -93,7 +93,7 @@ export const handler = async (event) => {
         Bucket: BUCKET,
         Key: key,
         ContentType: contentType ?? "application/octet-stream",
-        StorageClass: "GLACIER_IR",
+        StorageClass: storageClass === "GLACIER_IR" ? "GLACIER_IR" : "STANDARD",
       }), { expiresIn: 900 });
 
       return response(200, { url, key });

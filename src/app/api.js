@@ -16,18 +16,17 @@ export async function listFiles() {
   return files;
 }
 
-export async function getUploadUrl(filename, contentType) {
+export async function getUploadUrl(filename, contentType, storageClass) {
   const headers = await authHeaders();
-  const res = await fetch(`${API}/files/upload-url`, {
+  return (await fetch(`${API}/files/upload-url`, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, contentType }),
-  });
-  return res.json(); // { url, key }
+    body: JSON.stringify({ filename, contentType, storageClass }),
+  })).json();
 }
 
-export async function uploadFile(file) {
-  const { url } = await getUploadUrl(file.name, file.type);
+export async function uploadFile(file, storageClass) {
+  const { url } = await getUploadUrl(file.name, file.type, storageClass);
   await fetch(url, { method: "PUT", body: file });
 }
 

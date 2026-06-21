@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Cloud, Upload, FolderUp, X, Eye, EyeOff, FileArchive,
   CheckCircle2, FolderOpen, File, Download, Search, Image, 
-  FileText, Music, Archive,
+  FileText, Music, Archive, Info,
 } from "lucide-react";
 import { listFiles, uploadFile, getDownloadUrl, deleteFile } from "./api";
 import { signIn, signUp, confirmSignUp, signOut, getCurrentUser } from "aws-amplify/auth";
@@ -468,7 +468,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onLogin }: {
 
 // ─── Upload zone ─────────────────────────────────────────────────────────────
 
-function UploadZone({ onUploaded }: { onUploaded?: () => void }) {
+function UploadZone({ onUploaded, storageClass }: { onUploaded?: () => void; storageClass: string }) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploads, setUploads] = useState<{ name: string; size: string; status: "uploading" | "done" | "error" }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -490,18 +490,14 @@ function UploadZone({ onUploaded }: { onUploaded?: () => void }) {
     // Upload one by one, updating status as each finishes
     for (const file of fileArr) {
       try {
-        await uploadFile(file);
-        setUploads((prev) =>
-          prev.map((u) => u.name === file.name ? { ...u, status: "done" } : u)
-        );
+        await uploadFile(file, storageClass);
+        setUploads((prev) => prev.map((u) => u.name === file.name ? { ...u, status: "done" } : u));
       } catch {
-        setUploads((prev) =>
-          prev.map((u) => u.name === file.name ? { ...u, status: "error" } : u)
-        );
+        setUploads((prev) => prev.map((u) => u.name === file.name ? { ...u, status: "error" } : u));
       }
     }
     onUploaded?.();
-  }, []);
+  }, [storageClass]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -700,6 +696,7 @@ export default function App() {
   const [username, setUsername] = useState<string | null>(null);
   const [showFiles, setShowFiles] = useState(false);
   const [fileRefresh, setFileRefresh] = useState(0);
+  const [infrequentAccess, setInfrequentAccess] = useState(false);
 
   useEffect(() => {
     getCurrentUser()
@@ -719,6 +716,22 @@ export default function App() {
       className="min-h-screen"
       style={{ background: "#f7f5f2", fontFamily: "'DM Sans', sans-serif" }}
     >
+      <style>{`
+        .cloudstore-grid {
+          display: grid;
+          gap: 5rem;
+          grid-template-columns: 1fr 1fr;
+          align-items: start;
+        }
+        @media (max-width: 768px) {
+          .cloudstore-grid {
+            grid-template-columns: 1fr;
+            gap: 2.5rem;
+          }
+          .cloudstore-left { order: 2; }
+          .cloudstore-right { order: 1; }
+        }
+      `}</style>
       {/* Nav */}
       <nav
         className="flex items-center justify-between px-8 py-5 max-w-5xl mx-auto"
@@ -775,10 +788,10 @@ export default function App() {
 
       {/* Main */}
       <main className="max-w-5xl mx-auto px-8 pt-16 pb-28">
-        <div className="grid gap-20" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
+        <div className="cloudstore-grid">
 
           {/* Left */}
-          <div className="flex flex-col gap-10">
+          <div className="flex flex-col gap-10 cloudstore-left">
             <div>
               <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", color: "#b8aee8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1.25rem" }}>
                 Cloud storage
@@ -842,7 +855,7 @@ export default function App() {
 
           {/* Right: Upload card */}
           <div
-            className="rounded-2xl p-6"
+            className="rounded-2xl p-6 cloudstore-right"
             style={{
               background: "#ffffff",
               border: "1px solid #e5e0f0",
@@ -855,8 +868,67 @@ export default function App() {
                   <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: "#2d2a35", fontSize: "0.95rem" }}>
                     Upload
                   </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setInfrequentAccess((v) => !v)}
+                      className="flex items-center gap-2 rounded-full px-3 py-1.5 transition-colors"
+                      style={{
+                        background: infrequentAccess ? "#ede9fe" : "#f7f5f2",
+                        border: `1px solid ${infrequentAccess ? "#d9d4f0" : "#e5e0f0"}`,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 28, height: 16, borderRadius: 999,
+                          background: infrequentAccess ? "#7c6fcd" : "#d9d4f0",
+                          position: "relative",
+                          transition: "background 0.15s",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 12, height: 12, borderRadius: "50%",
+                            background: "#fff",
+                            position: "absolute", top: 2,
+                            left: infrequentAccess ? 14 : 2,
+                            transition: "left 0.15s",
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.78rem", color: "#4a4558", fontWeight: 500 }}>
+                        Infrequent Access
+                      </span>
+                      <div
+                      className="relative group"
+                      style={{ display: "flex", alignItems: "center" }}
+                    >
+                      <Info size={14} color="#b8aee8" style={{ cursor: "help" }} />
+                      <div
+                        className="opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 8px)",
+                          right: 0,
+                          width: "220px",
+                          background: "#2d2a35",
+                          color: "#fff",
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontSize: "0.75rem",
+                          lineHeight: 1.5,
+                          padding: "0.6rem 0.75rem",
+                          borderRadius: "0.5rem",
+                          zIndex: 10,
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+                        }}
+                      >
+                        Enable for files that will be downloaded rarely (No less than once every 90 days)
+                      </div>
+                    </div>
+                    </button>
+                  </div>
                 </div>
-                <UploadZone onUploaded={() => setFileRefresh((n) => n + 1)} />
+                <UploadZone onUploaded={() => setFileRefresh((n) => n + 1)} storageClass={infrequentAccess ? "GLACIER_IR" : "STANDARD"} />
                 {/* Directory preview */}
                 <div className="mt-5 pt-5" style={{ borderTop: "1px solid #f0eef9" }}>
                   <div className="mb-3">
