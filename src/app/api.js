@@ -13,6 +13,7 @@ export async function listFiles() {
   const headers = await authHeaders();
   const res = await fetch(`${API}/files`, { headers });
   const { files } = await res.json();
+  console.log(files);
   return files;
 }
 
