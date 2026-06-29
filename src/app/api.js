@@ -33,14 +33,16 @@ export async function uploadFile(file, storageClass, relativePath) {
 
 export async function getDownloadUrl(filename) {
   const headers = await authHeaders();
-  const res = await fetch(`${API}/files/${encodeURIComponent(filename)}`, { headers });
+  const encoded = filename.split("/").map(encodeURIComponent).join("/");
+  const res = await fetch(`${API}/files/${encoded}`, { headers });
   const { url } = await res.json();
   return url;
 }
 
 export async function deleteFile(filename) {
   const headers = await authHeaders();
-  await fetch(`${API}/files/${encodeURIComponent(filename)}`, {
+  const encoded = filename.split("/").map(encodeURIComponent).join("/");
+  await fetch(`${API}/files/${encoded}`, {
     method: "DELETE",
     headers,
   });
