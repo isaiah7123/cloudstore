@@ -142,9 +142,10 @@ function TreeRow({ node, depth, selected, onToggleSelect, fmt }: {
   const file = node.file;
   return (
     <div
-      className="flex items-center gap-2 rounded-lg px-2 py-1.5 cursor-pointer"
+      className="flex items-center rounded-lg px-2 py-1.5 cursor-pointer"
       style={{
         paddingLeft: `${8 + indent + 13}px`,
+        gap: "1.5rem",
         background: isSelected ? "#ede9fe" : "transparent",
       }}
       onClick={(e) => onToggleSelect(node, e)}
@@ -165,13 +166,13 @@ function TreeRow({ node, depth, selected, onToggleSelect, fmt }: {
       >
         {node.name}
       </span>
-      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#b8aee8", whiteSpace: "nowrap" }}>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#b8aee8", whiteSpace: "nowrap", minWidth: "100px", textAlign: "right" }}>
         {file?.modified ? new Date(file.modified).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
       </span>
-      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "56px", textAlign: "center" }}>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "64px", textAlign: "center" }}>
         {file?.size != null ? fmt(file.size) : ""}
       </span>
-      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "56px", textAlign: "right" }}>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "72px", textAlign: "right" }}>
         {file?.storageClass === "GLACIER_IR" ? "Infrequent" : "Standard"}
       </span>
     </div>
@@ -437,24 +438,21 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
 
         {/* Column headers */}
         <div
-          className="flex items-center gap-2 px-3 py-1.5"
-          style={{ background: "#faf9fc", borderBottom: "1px solid #f0eef9" }}
+          className="flex items-center px-3 py-1.5"
+          style={{ background: "#faf9fc", borderBottom: "1px solid #f0eef9", gap: "1.5rem" }}
         >
           <span style={{ width: 15, flexShrink: 0 }} />
           <span style={{ width: 15, flexShrink: 0 }} />
-          <span
-            className="flex-1"
-            style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", textTransform: "uppercase", letterSpacing: "0.06em" }}
-          >
+          <span className="flex-1" style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Name
           </span>
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "100px", textAlign: "right", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Modified
           </span>
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "56px", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "64px", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Size
           </span>
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "56px", textAlign: "right", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "72px", textAlign: "right", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Storage Class
           </span>
         </div>
