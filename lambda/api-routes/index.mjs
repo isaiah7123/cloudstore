@@ -33,9 +33,12 @@ function response(statusCode, body) {
 export const handler = async (event) => {
   const method = event.requestContext?.http?.method;
   const rawPath = event.rawPath;
-  let path = rawPath.replace(/^\/(prod|dev)/, "");
-  
-  console.log("METHOD:", method, "RAW:", rawPath, "STRIPPED:", path);
+  let path = event.rawPath;
+  const stage = event.requestContext?.stage;
+
+  if (stage && path.startsWith(`/${stage}`)) {
+    path = path.slice(stage.length + 1);
+  }
 
   try {
     const userId = await getUser(event);
@@ -59,7 +62,7 @@ export const handler = async (event) => {
 
     // GET /files/{filename} — get presigned download URL
     if (method === "GET" && path.startsWith("/files/")) {
-      const filename = decodeURIComponent(path.replace("/files/", ""));
+      const filename = decodeURIComponent(path.slice("/files/".length));
       const key = `users/${userId}/${filename}`;
 
       const url = await getSignedUrl(s3, new GetObjectCommand({
@@ -99,7 +102,7 @@ export const handler = async (event) => {
 
     // HEAD /files/{filename} — get file metadata without downloading
     if (method === "HEAD" && path.startsWith("/files/")) {
-      const filename = decodeURIComponent(path.replace("/files/", ""));
+      const filename = decodeURIComponent(path.slice("/files/".length));
       const key = `users/${userId}/${filename}`;
 
       const result = await s3.send(new HeadObjectCommand({
@@ -117,7 +120,7 @@ export const handler = async (event) => {
 
     // DELETE /files/{filename}
     if (method === "DELETE" && path.startsWith("/files/")) {
-      const filename = decodeURIComponent(path.replace("/files/", ""));
+      const filename = decodeURIComponent(path.slice("/files/".length));
       const key = `users/${userId}/${filename}`;
 
       await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
