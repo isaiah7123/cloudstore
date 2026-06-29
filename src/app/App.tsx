@@ -168,8 +168,11 @@ function TreeRow({ node, depth, selected, onToggleSelect, fmt }: {
       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#b8aee8", whiteSpace: "nowrap" }}>
         {file?.modified ? new Date(file.modified).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
       </span>
-      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "56px", textAlign: "right" }}>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "56px", textAlign: "center" }}>
         {file?.size != null ? fmt(file.size) : ""}
+      </span>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.72rem", color: "#c4bedd", minWidth: "56px", textAlign: "right" }}>
+        {file?.storageClass === "GLACIER_IR" ? "Infrequent" : "Standard"}
       </span>
     </div>
   );
@@ -339,8 +342,8 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
         className="relative flex flex-col rounded-2xl overflow-hidden"
         style={{
           width: "100%",
-          maxWidth: "600px",
-          height: "520px",
+          maxWidth: "900px",
+          height: "620px",
           background: "#ffffff",
           border: "1px solid #e5e0f0",
           boxShadow: "0 12px 40px rgba(124,111,205,0.12)",
@@ -448,8 +451,11 @@ function FileBrowserModal({ username, onClose }: { username: string; onClose: ()
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Modified
           </span>
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "56px", textAlign: "right", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "56px", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Size
+          </span>
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.7rem", color: "#c4bedd", minWidth: "56px", textAlign: "right", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Storage Class
           </span>
         </div>
 
