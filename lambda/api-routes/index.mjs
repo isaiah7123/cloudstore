@@ -55,7 +55,7 @@ export const handler = async (event) => {
         name: obj.Key.replace(`users/${userId}/`, ""),
         size: obj.Size,
         modified: obj.LastModified,
-        storageClass: obj.storageClass,
+        storageClass: obj.StorageClass,
       }));
 
       return response(200, { files });
