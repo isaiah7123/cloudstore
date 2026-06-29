@@ -1,7 +1,7 @@
 // src/api.js
 import { fetchAuthSession } from "aws-amplify/auth";
 
-const API = "https://fohkc53ail.execute-api.us-west-2.amazonaws.com/prod";
+const API = "https://fohkc53ail.execute-api.us-west-2.amazonaws.com";
 
 async function authHeaders() {
   const session = await fetchAuthSession();
