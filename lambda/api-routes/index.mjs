@@ -32,7 +32,10 @@ function response(statusCode, body) {
 
 export const handler = async (event) => {
   const method = event.requestContext?.http?.method;
-  let path = event.rawPath.replace(/^\/(prod|dev)/, "");
+  const rawPath = event.rawPath;
+  let path = rawPath.replace(/^\/(prod|dev)/, "");
+  
+  console.log("METHOD:", method, "RAW:", rawPath, "STRIPPED:", path);
 
   try {
     const userId = await getUser(event);
