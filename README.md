@@ -2,6 +2,8 @@
 
 A full-stack cloud file storage app built with React and TypeScript, running on a serverless AWS backend.
 
+![Cloudstore Welcome](docs/welcome.png)
+
 ## Features
 
 - **Secure accounts:** sign-up and sign-in with Amazon Cognito. A JWT authorizer protects every API request.
